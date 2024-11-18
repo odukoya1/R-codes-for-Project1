@@ -1,0 +1,588 @@
+\documentclass[a4paper]{article}
+\usepackage{Sweave}
+\usepackage{amsmath}
+%\usepackage{pdflscape}
+\usepackage[a4paper, left=20mm, top=20mm]{geometry}
+\usepackage{graphicx} % For including the logo
+\title{ }
+\author{ODUKOYA OLANREWAJU UMAR }
+\date{\today} % U
+\begin{document}
+\begin{center}Odukoya Olanrewaju Umar \\ 202287974\\ Computational Statistics 
+
+\end{center}
+\section*{Question 1} 
+<<echo=FALSE,results='asis'>>=
+# Load necessary library
+library(xtable)
+
+# Define coefficients for logistic model
+beta_0 <- 0.1
+beta_1 <- 1.1
+beta_2 <- -0.9
+
+# Function to generate data for logistic regression
+generate_data <- function(N) {
+  x1 <- runif(N, min = -2, max = 2)
+  x2 <- runif(N, min = -2, max = 2)
+  
+  linear_predictor <- beta_0 + beta_1 * x1 + beta_2 * x2
+  probabilities <- 1 / (1 + exp(-linear_predictor))
+  
+  y <- rbinom(N, size = 1, prob = probabilities)
+  
+  prop_zeros <- sum(y == 0) / N
+  prop_ones <- sum(y == 1) / N
+  
+  list(prop_zeros = prop_zeros, prop_ones = prop_ones)
+}
+
+# Define sample sizes
+set.seed(123)
+sample_sizes <- c(10, 50, 100)
+
+# Prepare a data frame for the LaTeX table
+results <- data.frame(
+  Sample_Size = sample_sizes,
+  Proportion_0s = numeric(length(sample_sizes)),
+  Proportion_1s = numeric(length(sample_sizes))
+)
+
+# Populate the data frame with proportions
+for (i in seq_along(sample_sizes)) {
+  data <- generate_data(sample_sizes[i])
+  results$Proportion_0s[i] <- data$prop_zeros
+  results$Proportion_1s[i] <- data$prop_ones
+}
+
+# Create and print the LaTeX table
+latex_table <- xtable(results, caption = "Proportions of 0's and 1's for Different Sample Sizes")
+print(latex_table, include.rownames = FALSE)
+
+@
+
+
+\section*{Question 2} 
+
+<<echo=FALSE,warning=FALSE,results='asis'>>=
+
+set.seed(123)
+# Load necessary library
+library(xtable)
+
+# Define true parameter values
+beta_true <- c(0.1, 1.1, -0.9)
+
+# Function to generate logistic regression data
+generate_logistic_data <- function(N) {
+  x1 <- runif(N, -2, 2)
+  x2 <- runif(N, -2, 2)
+  logit_p <- beta_true[1] + beta_true[2] * x1 + beta_true[3] * x2
+  p <- 1 / (1 + exp(-logit_p))
+  y <- rbinom(N, 1, p)
+  return(data.frame(x1 = x1, x2 = x2, y = y))
+}
+
+# Log-likelihood function
+log_likelihood <- function(beta, x1, x2, y) {
+  logit_p <- beta[1] + beta[2] * x1 + beta[3] * x2
+  p <- 1 / (1 + exp(-logit_p))
+  ll <- sum(y * log(p) + (1 - y) * log(1 - p))
+  return(ll)
+}
+
+# Importance sampling for Bayesian inference
+importance_sampling <- function(N, M = 10000, proposal_sd = 3) {
+  data <- generate_logistic_data(N)
+  x1 <- data$x1
+  x2 <- data$x2
+  y <- data$y
+  
+  proposal_samples <- matrix(rnorm(M * 3, mean = 0, sd = proposal_sd), ncol = 3)
+  
+  log_likelihoods <- apply(proposal_samples, 1, log_likelihood, x1 = x1, x2 = x2, y = y)
+  log_priors <- rowSums(dnorm(proposal_samples, mean = 0, sd = 1, log = TRUE))
+  
+  log_weights <- log_likelihoods + log_priors
+  max_log_weight <- max(log_weights)
+  weights <- exp(log_weights - max_log_weight) / sum(exp(log_weights - max_log_weight))
+  
+  posterior_means <- colSums(proposal_samples * weights)
+  posterior_se <- sqrt(colSums((proposal_samples - posterior_means)^2 * weights))
+  ess <- 1 / sum(weights^2)
+  
+  glm_fit <- glm(y ~ x1 + x2, data = data, family = binomial())
+  mle <- coef(glm_fit)
+  
+  return(c(N = N, ess = ess, posterior_means, posterior_se))
+}
+
+# Sample sizes to test
+sample_sizes <- c(10, 50, 100)
+
+# Collect results into a data frame
+results <- do.call(rbind, lapply(sample_sizes, importance_sampling))
+
+# Create LaTeX table
+colnames(results) <- c("Sample Size", "ESS", "Beta_0 Mean", "Beta_1 Mean", "Beta_2 Mean",
+                       "Beta_0 SE", "Beta_1 SE", "Beta_2 SE")
+latex_table <- xtable(results, caption = "Bayesian Importance Sampling Results")
+print(latex_table, include.rownames = FALSE)
+
+
+
+@
+
+
+
+<<echo=FALSE, warning=FALSE,results='asis'>>=
+# Define true parameter values
+set.seed(123)
+beta_true <- c(0.1, 1.1, -0.9)
+
+# Function to generate logistic regression data
+generate_logistic_data <- function(N) {
+  x1 <- runif(N, -2, 2)
+  x2 <- runif(N, -2, 2)
+  logit_p <- beta_true[1] + beta_true[2] * x1 + beta_true[3] * x2
+  p <- 1 / (1 + exp(-logit_p))
+  y <- rbinom(N, 1, p)
+  return(data.frame(x1 = x1, x2 = x2, y = y))
+}
+
+# Log-likelihood function
+log_likelihood <- function(beta, x1, x2, y) {
+  logit_p <- beta[1] + beta[2] * x1 + beta[3] * x2
+  p <- 1 / (1 + exp(-logit_p))
+  ll <- sum(y * log(p) + (1 - y) * log(1 - p))
+  return(ll)
+}
+
+# Importance sampling for Bayesian inference
+importance_sampling <- function(N, M = 10000, proposal_sd = 3) {
+  # Generate data
+  data <- generate_logistic_data(N)
+  x1 <- data$x1
+  x2 <- data$x2
+  y <- data$y
+  
+  # Proposal samples
+  proposal_samples <- matrix(rnorm(M * 3, mean = 0, sd = proposal_sd), ncol = 3)
+  
+  # Calculate log-likelihood and log-prior for each sample
+  log_likelihoods <- apply(proposal_samples, 1, log_likelihood, x1 = x1, x2 = x2, y = y)
+  log_priors <- rowSums(dnorm(proposal_samples, mean = 0, sd = 1, log = TRUE))
+  
+  # Log-weights and normalize
+  log_weights <- log_likelihoods + log_priors
+  max_log_weight <- max(log_weights)
+  weights <- exp(log_weights - max_log_weight) / sum(exp(log_weights - max_log_weight))
+  
+  # Posterior means and standard errors
+  posterior_means <- colSums(proposal_samples * weights)
+  posterior_se <- sqrt(colSums((proposal_samples - posterior_means)^2 * weights))
+  
+  # Effective Sample Size (ESS)
+  ess <- 1 / sum(weights^2)
+  
+  # Histogram of posterior samples
+  par(mfrow = c(1, 3))
+  hist(proposal_samples[, 1], weights = weights, main = expression(beta[0]), xlab = "Beta0", probability = TRUE)
+  hist(proposal_samples[, 2], weights = weights, main = expression(beta[1]), xlab = "Beta1", probability = TRUE)
+  hist(proposal_samples[, 3], weights = weights, main = expression(beta[2]), xlab = "Beta2", probability = TRUE)
+  
+  # Compare with MLE
+  glm_fit <- glm(y ~ x1 + x2, data = data, family = binomial())
+  mle <- coef(glm_fit)
+  
+  cat("Sample size:", N, "\n")
+  cat("Posterior means:", posterior_means, "\n")
+  cat("Standard errors:", posterior_se, "\n")
+  cat("Effective Sample Size (ESS):", ess, "\n")
+  cat("MLEs from glm:", mle, "\n")
+  cat("Difference (Posterior mean - MLE):", posterior_means - mle, "\n\n")
+  
+  return(list(posterior_means = posterior_means, posterior_se = posterior_se, ess = ess))
+}
+
+# Sample sizes to test
+sample_sizes <- c(10, 50, 100)
+
+# Run Bayesian inference with importance sampling for each sample size
+for (N in sample_sizes) {
+  result <- importance_sampling(N)
+}
+
+
+@
+
+\section*{Question 3} 
+
+<<echo=FALSE, warning=FALSE>>=
+
+# Extend true parameters for 9 covariates
+set.seed(123)
+beta_true <- c(0.1, 1.1, -0.9, 0.5, -0.3, 0.7, -0.6, 0.4, -0.2)
+
+# Function to generate logistic regression data with 9 covariates
+generate_logistic_data_high_dim <- function(N) {
+  # Generate 9 covariates uniformly from [-2, 2]
+  x <- matrix(runif(N * 8, -2, 2), ncol = 8)
+  # Compute logistic probability
+  logit_p <-  beta_true[1] + x %*% beta_true[-1]
+  p <- 1 / (1 + exp(-logit_p))
+  # Generate binary response
+  y <- rbinom(N, 1, p)
+  return(data.frame(y = y, x))
+}
+
+# Log-likelihood function for 9-dimensional logistic regression
+log_likelihood_high_dim <- function(beta, x, y) {
+  # Compute logit probabilities
+  logit_p <-  beta_true[1] + x %*% beta_true[-1]
+  p <- 1 / (1 + exp(-logit_p))
+  # Sum of log-likelihood
+  ll <- sum(y * log(p) + (1 - y) * log(1 - p))
+  return(ll)
+}
+
+# Importance sampling for Bayesian inference in 9 dimensions
+importance_sampling_high_dim <- function(N, M = 10000, proposal_sd = 3) {
+  # Generate data
+  data <- generate_logistic_data_high_dim(N)
+  x <- as.matrix(data[, -1])
+  y <- data$y
+  
+  # Proposal samples: multivariate normal samples in 9D
+  proposal_samples <- matrix(rnorm(M * 9, mean = 0, sd = proposal_sd), ncol = 9)
+  
+  # Calculate log-likelihood and log-prior for each sample
+  log_likelihoods <- apply(proposal_samples, 1, log_likelihood_high_dim, x = x, y = y)
+  log_priors <- rowSums(dnorm(proposal_samples, mean = 0, sd = 1, log = TRUE))
+  
+  # Compute log-weights and normalize
+  log_weights <- log_likelihoods + log_priors
+  max_log_weight <- max(log_weights)
+  weights <- exp(log_weights - max_log_weight) / sum(exp(log_weights - max_log_weight))
+  
+  # Posterior means and standard errors
+  posterior_means <- colSums(proposal_samples * weights)
+  posterior_se <- sqrt(colSums((proposal_samples - posterior_means)^2 * weights))
+  
+  # Effective Sample Size (ESS)
+  ess <- 1 / sum(weights^2)
+  
+  # Histogram of posterior samples for each parameter
+  par(mfrow = c(3, 3))
+  for (i in 1:9) {
+    hist(proposal_samples[, i], weights = weights, main = paste("Beta", i - 1), xlab = paste("Beta", i - 1), probability = TRUE)
+  }
+  
+  # Compare with MLE
+  glm_fit <- glm(y ~ ., data = data, family = binomial())
+  mle <- coef(glm_fit)
+  
+  cat("Sample size:", N, "\n")
+  cat("Posterior means:", posterior_means, "\n")
+  cat("Standard errors:", posterior_se, "\n")
+  cat("Effective Sample Size (ESS):", ess, "\n")
+  cat("MLEs from glm:", mle, "\n")
+  cat("Difference (Posterior mean - MLE):", posterior_means - mle, "\n\n")
+  
+  return(list(posterior_means = posterior_means, posterior_se = posterior_se, ess = ess))
+}
+
+# Sample sizes to test
+sample_sizes <- c(10, 50, 100)
+
+# Run Bayesian inference with importance sampling for each sample size in 9D
+for (N in sample_sizes) {
+  result <- importance_sampling_high_dim(N)
+}
+
+
+@
+
+
+
+
+<<echo=FALSE,results='asis'>>=
+
+# Load xtable package
+library(xtable)
+
+# Define results for each sample size
+sample_sizes <- c(10, 50, 100)
+Esti_ss<- c(5.3736, 10.1240,13.7316)
+posterior_means <- list(
+  c(-0.1775304, 0.2891553, -0.4215707, -0.6173829, -0.507638, -0.1540735, -0.371124, 0.3063508, 0.2925097),
+  c(0.1770695, -0.07068759, 0.001177273, 0.1801408, -0.3361391, 0.3679451, -0.2613, 0.5293411, 0.2593191),
+  c(0.1400962, -0.5173298, -0.01677269, -0.136935, -0.2453685, -0.3354349, 0.08947709, -0.03322875, -0.2542656)
+)
+standard_errors <- list(
+  c(0.7952192, 0.7952356, 1.134965, 1.135459, 0.829652, 0.7998715, 0.745609, 1.017581, 0.947244),
+  c(1.271402, 1.111322, 1.367892, 0.8887163, 1.112229, 0.9615394, 1.094613, 1.109676, 0.9323246),
+  c(0.9109555, 1.251665, 0.7696488, 0.9935251, 1.177593, 0.900346, 1.041663, 0.9475789, 0.9883177)
+)
+differences <- list(
+  c(28.23605, -28.39364, -15.79932, -6.774925, 7.283609, 19.06335, -12.24663, -11.81458, 11.09077),
+  c(0.2911845, -1.447227, 1.270988, 0.3085797, 0.3509312, -0.4846224, 1.643885, -1.140992, 1.317328),
+  c(-0.1024748, -1.744782, 0.9876072, -0.5505749, -0.05690466, -1.640166, 0.9039201, -0.7341411, -0.3507906)
+)
+
+# Combine results into data frames
+means_df <- data.frame(
+  Sample_Size = rep(sample_sizes, each = 9),
+  Beta = rep(0:8, times = 3),
+  Posterior_Mean = unlist(posterior_means)
+)
+se_df <- data.frame(
+  Sample_Size = rep(sample_sizes, each = 9),
+  Beta = rep(0:8, times = 3),
+  Standard_Error = unlist(standard_errors)
+)
+difference_df <- data.frame(
+  Sample_Size = rep(sample_sizes, each = 9),
+  Beta = rep(0:8, times = 3),
+  Difference = unlist(differences)
+)
+
+# Generate LaTeX tables
+means_table <- xtable(means_df, caption = "Posterior Means for Each Sample Size", digits = 4)
+se_table <- xtable(se_df, caption = "Standard Errors for Each Sample Size", digits = 4)
+difference_table <- xtable(difference_df, caption = "Difference (Posterior Mean - MLE) for Each Sample Size", digits = 4)
+
+# Print LaTeX tables
+#print(means_table, include.rownames = FALSE)
+#print(se_table, include.rownames = FALSE)
+#print(difference_table, include.rownames = FALSE)
+
+
+
+@
+
+
+<<echo=FALSE,results='asis'>>=
+# Load xtable package
+library(xtable)
+
+# Combine results into data frames with horizontal layout
+means_df <- data.frame(
+  Sample_Size = sample_sizes,
+  Ess=Esti_ss,
+  t(sapply(posterior_means, c))
+)
+colnames(means_df) <- c("Sample_Size","Ess", paste0("Beta_", 0:8))
+
+se_df <- data.frame(
+  Sample_Size = sample_sizes,
+  Ess=Esti_ss,
+  t(sapply(standard_errors, c))
+)
+colnames(se_df) <- c("Sample_Size","Ess", paste0("Beta_", 0:8))
+
+difference_df <- data.frame(
+  Sample_Size = sample_sizes,
+  Ess=Esti_ss,
+  t(sapply(differences, c))
+)
+colnames(difference_df) <- c("Sample_Size","Ess", paste0("Beta_", 0:8))
+
+# Generate LaTeX tables
+means_table <- xtable(means_df, caption = "Posterior Means for Each Sample Size", digits = 4)
+se_table <- xtable(se_df, caption = "Standard Errors for Each Sample Size", digits = 4)
+difference_table <- xtable(difference_df, caption = "Difference (Posterior Mean - MLE) for Each Sample Size", digits = 4)
+
+# Print LaTeX tables
+print(means_table, include.rownames = FALSE)
+print(se_table, include.rownames = FALSE)
+print(difference_table, include.rownames = FALSE)
+
+
+@
+
+
+
+
+\section*{Question 4 }
+<<echo=FALSE, warning=FALSE>>=
+library(mvtnorm)
+
+# Helper functions
+log_likelihood <- function(beta, X, y) {
+  linear_predictor <- beta[1] + X %*% beta[-1]
+  p <- 1 / (1 + exp(-linear_predictor))
+  sum(y * log(p) + (1 - y) * log(1 - p))
+}
+
+log_prior <- function(beta, prior_sd) {
+  sum(dnorm(beta, mean = 0, sd = prior_sd, log = TRUE))
+}
+
+log_posterior <- function(beta, X, y, prior_sd) {
+  log_likelihood(beta, X, y) + log_prior(beta, prior_sd)
+}
+
+hessian_matrix <- function(beta, X, y, prior_sd) {
+  # Add intercept column to X
+  X_full <- cbind(1, X)
+  # Compute probabilities
+  linear_predictor <- X_full %*% beta
+  p <- 1 / (1 + exp(-linear_predictor))
+  # Diagonal weight matrix
+  W <- diag(as.vector(p * (1 - p)))
+  # Prior precision matrix
+  prior_precision <- diag(1 / prior_sd^2, length(beta))
+  # Return Hessian
+  -t(X_full) %*% W %*% X_full - prior_precision
+}
+
+# Generate synthetic data
+set.seed(42)
+N_list <- c(10, 50, 100)
+results <- list()
+
+for (N in N_list) {
+  # Generate data
+  X <- matrix(runif(N * 9, -2, 2), nrow = N, ncol = 9)
+  beta_true <- c(0.1, 1.1, -0.9, 0.5, -0.3, 0.7, -0.4, 0.2, -0.6, 0.3)
+  linear_predictor <- beta_true[1] + X %*% beta_true[-1]
+  p <- 1 / (1 + exp(-linear_predictor))
+  y <- rbinom(N, size = 1, prob = p)
+  
+  # Maximum likelihood estimation (for comparison)
+  glm_fit <- glm(y ~ X, family = binomial)
+  mle <- coef(glm_fit)
+  
+  # Posterior mode via optimization
+  posterior_mode <- optim(par = rep(0, 10),
+                          fn = function(beta) -log_posterior(beta, X, y, prior_sd = 1),
+                          method = "BFGS")$par
+  
+  # Importance sampling with smarter proposal
+  n_samples <- 1000
+  #proposal_samples <- rmvnorm(n_samples, mean = posterior_mode, 
+                             # sigma = solve(-hessian_matrix(posterior_mode, X, y, prior_sd = 1)))
+  proposal_samples <- rmvnorm(n_samples, mean = posterior_mode, 
+                              sigma = solve(-hessian_matrix(posterior_mode, X, y, prior_sd = 1)))
+  
+  # Compute weights
+  weights <- exp(sapply(1:n_samples, function(i) {
+    log_posterior(proposal_samples[i, ], X, y, prior_sd = 1) - 
+      dmvnorm(proposal_samples[i, ], mean = posterior_mode, 
+              sigma = solve(-hessian_matrix(posterior_mode, X, y, prior_sd = 1)), log = TRUE)
+  }))
+  
+  # Normalize weights
+  weights <- weights / sum(weights)
+  
+  # Effective sample size
+  ess <- 1 / sum(weights^2)
+  
+  # Posterior mean and standard errors
+  posterior_means <- colSums(proposal_samples * weights)
+  posterior_sds <- sqrt(colSums((proposal_samples - posterior_means)^2 * weights))
+  
+  # Save results
+  results[[as.character(N)]] <- list(
+    PosteriorMeans = posterior_means,
+    PosteriorSDs = posterior_sds,
+    ESS = ess,
+    MLE = mle,
+    Difference = posterior_means - mle
+  )
+  
+  # Plot histograms of posterior samples
+  par(mfrow = c(2, 5))
+  for (i in 1:10) {
+    hist(proposal_samples[, i], weights = weights, main = paste0("Beta_", i, " (N=", N, ")"), xlab = "")
+  }
+}
+
+# Display results
+for (N in N_list) {
+  cat("\nSample size:", N, "\n")
+  cat("Posterior means:", results[[as.character(N)]]$PosteriorMeans, "\n")
+  cat("Standard errors:", results[[as.character(N)]]$PosteriorSDs, "\n")
+  cat("Effective Sample Size (ESS):", results[[as.character(N)]]$ESS, "\n")
+  cat("MLEs from glm:", results[[as.character(N)]]$MLE, "\n")
+  cat("Difference (Posterior mean - MLE):", results[[as.character(N)]]$Difference, "\n")
+}
+
+@
+
+
+
+
+
+
+<<echo=FALSE,results='asis'>>=
+library(xtable)
+
+# Combine results into data frames for tables
+posterior_means_table <- data.frame()
+posterior_sds_table <- data.frame()
+
+for (N in N_list) {
+  result <- results[[as.character(N)]]
+  
+  # Combine posterior means
+  posterior_means_table <- rbind(
+    posterior_means_table,
+    c(N, result$ESS, result$PosteriorMeans)
+  )
+  
+  # Combine posterior standard deviations
+  posterior_sds_table <- rbind(
+    posterior_sds_table,
+    c(N, result$ESS, result$PosteriorSDs)
+  )
+}
+
+# Name the columns
+colnames(posterior_means_table) <- c("Sample", "ESS", paste0("beta_", 0:9))
+colnames(posterior_sds_table) <- c("Sample", "ESS", paste0("beta_", 0:9))
+
+# Convert tables to LaTeX
+posterior_means_xtable <- xtable(posterior_means_table, 
+                                  caption = "Posterior Means for Each Beta Coefficient", 
+                                  digits = 3)
+posterior_sds_xtable <- xtable(posterior_sds_table, 
+                                caption = "Posterior Standard Deviations for Each Beta Coefficient", 
+                                digits = 3)
+
+# Print LaTeX tables
+print(posterior_means_xtable, include.rownames = FALSE)
+print(posterior_sds_xtable, include.rownames = FALSE)
+
+
+@
+
+
+
+<<echo=FALSE,,results='asis'>>=
+
+# Store the differences for all sample sizes
+differences <- data.frame()
+
+for (N in N_list) {
+  diff <- results[[as.character(N)]]$PosteriorMeans - results[[as.character(N)]]$MLE
+  differences <- rbind(differences, c(N, diff))
+}
+
+# Assign column names
+colnames(differences) <- c("SampleSize", paste0("beta_", 0:9))
+
+# Create the LaTeX table
+library(xtable)
+latex_table <- xtable(differences, 
+                      caption = "Differences between Posterior Means and MLEs for each \\(\\beta\\)",
+                      label = "tab:difference_table")
+print(latex_table, type = "latex", include.rownames = FALSE)
+
+
+@
+
+
+
+\end{document}
